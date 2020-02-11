@@ -12,7 +12,6 @@ from tqdm import trange
 from warpctc_pytorch import CTCLoss
 
 from model import DeepSpeech, supported_rnns
-from utils import convert_model_to_half
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--batch-size', type=int, default=32, help='Size of input')
@@ -70,9 +69,10 @@ model = DeepSpeech(rnn_hidden_size=args.hidden_size,
                    audio_conf=audio_conf,
                    labels=labels,
                    rnn_type=supported_rnns[rnn_type],
-                   mixed_precision=args.mixed_precision)
+                   )
 model = model.to(device)
 if args.mixed_precision:
+    from utils import convert_model_to_half
     model = convert_model_to_half(model)
 print("Number of parameters: %d" % DeepSpeech.get_param_size(model))
 

@@ -207,11 +207,11 @@ if __name__ == '__main__':
     parameters = model.parameters()
     optimizer = torch.optim.SGD(parameters, lr=args.lr,
                                 momentum=args.momentum, nesterov=True, weight_decay=1e-5)
-
-    model, optimizer = amp.initialize(model, optimizer,
-                                      opt_level=args.opt_level,
-                                      keep_batchnorm_fp32=args.keep_batchnorm_fp32,
-                                      loss_scale=args.loss_scale)
+    if args.cuda and args.opt_level is not None:
+        model, optimizer = amp.initialize(model, optimizer,
+                                          opt_level=args.opt_level,
+                                          keep_batchnorm_fp32=args.keep_batchnorm_fp32,
+                                          loss_scale=args.loss_scale)
 
     if optim_state is not None:
         optimizer.load_state_dict(optim_state)

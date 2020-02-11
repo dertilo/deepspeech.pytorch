@@ -1,0 +1,36 @@
+BootStrap: docker
+From: pytorch/pytorch:1.2-cuda10.0-cudnn7-devel
+
+%environment
+    # use bash as default shell
+    SHELL=/bin/bash
+    export SHELL
+
+    # add CUDA paths
+    CPATH="/usr/local/cuda/include:$CPATH"
+
+    # make conda accessible
+    PATH="/opt/conda/bin:$PATH"
+    PATH="/usr/local/cuda/bin:$PATH"
+    LD_LIBRARY_PATH="/usr/local/cuda/lib64:$LD_LIBRARY_PATH"
+    CUDA_HOME="/usr/local/cuda"
+    export CPATH PATH LD_LIBRARY_PATH CUDA_HOME
+
+%post
+    apt-get update -y
+    apt-get install -y git curl ca-certificates bzip2 cmake tree htop bmon iotop sox libsox-dev libsox-fmt-all vim
+
+    PATH="/opt/conda/bin:$PATH"
+    pip install cython visdom cffi tensorboardX wget
+
+    git clone https://github.com/SeanNaren/warp-ctc.git
+    cd warp-ctc; mkdir build; cd build; cmake ..; make  && cd ..
+    cd pytorch_binding; python setup.py install && cd ..
+
+    pip install torchaudio==0.3.0
+
+    git clone --recursive https://github.com/parlance/ctcdecode.git
+    cd ctcdecode; pip install .  && cd ..
+
+    git clone --recursive https://github.com/NVIDIA/apex.git
+    cd apex; pip install .  && cd ..

@@ -148,7 +148,19 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
         """
         with open(manifest_filepath) as f:
             ids = f.readlines()
-        ids = [x.strip().split(',') for x in ids]
+
+        def fix_path(wav_file, txt_file):
+            base_path = 'LibriSpeech_dataset'
+            def splitit(s):
+                tmp = s.split(base_path)
+                assert len(tmp) == 2
+                _, f = tmp
+                return f
+            wav_file = '/'.join([base_path, splitit(wav_file)])
+            txt_file = '/'.join([base_path, splitit(txt_file)])
+            return wav_file, txt_file
+
+        ids = [fix_path(*x.strip().split(',')) for x in ids]
         self.ids = ids
         self.size = len(ids)
         self.labels_map = dict([(labels[i], i) for i in range(len(labels))])

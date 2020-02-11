@@ -1,29 +1,16 @@
-BootStrap: docker
-From: pytorch/pytorch:1.2-cuda10.0-cudnn7-devel
+BootStrap: localimage
+From: /home/tilo/code/UTIL/containerizing/singularity/pytorch.sif #see https://github.com/dertilo/containerizing.git
 
-%environment
-    # use bash as default shell
-    SHELL=/bin/bash
-    export SHELL
-
-    # add CUDA paths
-    CPATH="/usr/local/cuda/include:$CPATH"
-
-    # make conda accessible
-    PATH="/opt/conda/bin:$PATH"
-    PATH="/usr/local/cuda/bin:$PATH"
-    LD_LIBRARY_PATH="/usr/local/cuda/lib64:$LD_LIBRARY_PATH"
-    CUDA_HOME="/usr/local/cuda"
-    export CPATH PATH LD_LIBRARY_PATH CUDA_HOME
+%files
+    ./requirements.txt /root/requirements.txt
 
 %post
-    apt-get update -y
-    apt-get install -y git curl ca-certificates bzip2 cmake tree htop bmon iotop sox libsox-dev libsox-fmt-all vim
 
     PATH="/opt/conda/bin:$PATH"
-    pip install cython visdom cffi tensorboardX wget
+    pip install -r /root/requirements.txt
 
     git clone https://github.com/SeanNaren/warp-ctc.git
+    CUDA_HOME="/usr/local/cuda"
     cd warp-ctc; mkdir build; cd build; cmake ..; make  && cd ..
     cd pytorch_binding; python setup.py install && cd ..
 

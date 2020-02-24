@@ -18,6 +18,7 @@ from torch.utils.data import Dataset
 windows = {'hamming': scipy.signal.hamming, 'hann': scipy.signal.hann, 'blackman': scipy.signal.blackman,
            'bartlett': scipy.signal.bartlett}
 
+SAMPLE_RATE=16_000
 
 def load_audio(path):
     sample_rate, sound = read(path)
@@ -28,6 +29,19 @@ def load_audio(path):
         else:
             sound = sound.mean(axis=1)  # multiple channels, average
     return sound
+
+# def load_audio(path):
+#     sound, sample_rate = torchaudio.load(path, normalization=True)
+#     if sample_rate != SAMPLE_RATE:
+#         resampler = torchaudio.transforms.Resample(orig_freq=sample_rate,new_freq=SAMPLE_RATE)
+#         sound = resampler(sound)
+#     sound = sound.numpy().T
+#     if len(sound.shape) > 1:
+#         if sound.shape[1] == 1:
+#             sound = sound.squeeze()
+#         else:
+#             sound = sound.mean(axis=1)  # multiple channels, average
+#     return sound
 
 
 class AudioParser(object):
@@ -149,18 +163,28 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
         with open(manifest_filepath) as f:
             ids = f.readlines()
 
-        def fix_path(wav_file, txt_file):
-            base_path = 'LibriSpeech_dataset'
-            def splitit(s):
-                tmp = s.split(base_path)
-                assert len(tmp) == 2
-                _, f = tmp
-                return f
-            wav_file = '/'.join([base_path, splitit(wav_file)])
-            txt_file = '/'.join([base_path, splitit(txt_file)])
-            return wav_file, txt_file
+        if ('libri' in manifest_filepath): # TODO(tilo): just too lazy to rebuild the csvs
+            def fix_path(wav_file, txt_file):
+                if 'libri_train100_manifest.csv'==manifest_filepath:
+                    base_path = 'LibriSpeech_train_100'
+                else:
+                    base_path = 'LibriSpeech_dataset'
 
-        ids = [fix_path(*x.strip().split(',')) for x in ids]
+                def splitit(s):
+                    tmp = s.split(base_path)
+                    if len(tmp) != 2:
+                        print(s)
+                        assert False
+                    _, f = tmp
+                    return f
+                wav_file = '/'.join([base_path, splitit(wav_file)])
+                txt_file = '/'.join([base_path, splitit(txt_file)])
+                return wav_file, txt_file
+
+            ids = [fix_path(*x.strip().split(',')) for x in ids]
+        else:
+            ids = [x.strip().split(',') for x in ids]
+
         self.ids = ids
         self.size = len(ids)
         self.labels_map = dict([(labels[i], i) for i in range(len(labels))])

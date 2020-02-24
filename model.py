@@ -1,5 +1,6 @@
 import math
 from collections import OrderedDict
+from apex.parallel import DistributedDataParallel
 
 import torch
 import torch.nn as nn
@@ -247,6 +248,10 @@ class DeepSpeech(nn.Module):
     @staticmethod
     def serialize(model, optimizer=None, amp=None, epoch=None, iteration=None, loss_results=None,
                   cer_results=None, wer_results=None, avg_loss=None, meta=None):
+
+        if isinstance(model, DistributedDataParallel):
+            model = model.module
+
         package = {
             'version': model.version,
             'hidden_size': model.hidden_size,

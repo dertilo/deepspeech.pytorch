@@ -162,8 +162,8 @@ if __name__ == '__main__':
             best_wer = wer_results[start_epoch]
             if main_proc and args.visdom:  # Add previous scores to visdom graph
                 visdom_logger.load_previous_values(start_epoch, package)
-            if main_proc and args.tensorboard:  # Previous scores to tensorboard logs
-                tensorboard_logger.load_previous_values(start_epoch, package)
+            # if main_proc and args.tensorboard:  # Previous scores to tensorboard logs #TODO: should not be necessary!
+            #     tensorboard_logger.load_previous_values(start_epoch, package)
     else:
         with open(args.labels_path) as label_file:
             labels = str(''.join(json.load(label_file)))
@@ -323,11 +323,6 @@ if __name__ == '__main__':
             visdom_logger.update(epoch, values)
         if args.tensorboard and main_proc:
             tensorboard_logger.update(epoch, values, model.named_parameters())
-            values = {
-                'Avg Train Loss': avg_loss,
-                'Avg WER': wer,
-                'Avg CER': cer
-            }
 
         if main_proc and args.checkpoint:
             file_path = '%s/deepspeech_%d.pth.tar' % (save_folder, epoch + 1)

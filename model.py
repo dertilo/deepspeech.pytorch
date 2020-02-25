@@ -246,8 +246,10 @@ class DeepSpeech(nn.Module):
         return model
 
     @staticmethod
-    def serialize(model, optimizer=None, amp=None, epoch=None, iteration=None, loss_results=None,
-                  cer_results=None, wer_results=None, avg_loss=None, meta=None):
+    def serialize(model, optimizer=None, amp=None, epoch=None, iteration=None,
+                  log_data = None,
+                  avg_loss=None,
+                  meta=None):
 
         if isinstance(model, DistributedDataParallel):
             model = model.module
@@ -272,10 +274,8 @@ class DeepSpeech(nn.Module):
             package['epoch'] = epoch + 1  # increment for readability
         if iteration is not None:
             package['iteration'] = iteration
-        if loss_results is not None:
-            package['loss_results'] = loss_results
-            package['cer_results'] = cer_results
-            package['wer_results'] = wer_results
+        if log_data is not None:
+            package.update(log_data)
         if meta is not None:
             package['meta'] = meta
         return package

@@ -131,7 +131,7 @@ def train_one_epoch(
                 "Epoch: [{0}][{1}/{2}]\t"
                 "Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t"
                 "Data {data_time.val:.3f} ({data_time.avg:.3f})\t"
-                "Loss {loss.val:.4f} ({loss.avg:.4f})\t".format(
+                "Loss {loss:.4f} ({loss:.4f})\t".format(
                     (epoch + 1),
                     (i + 1),
                     len(train_sampler),
@@ -141,5 +141,5 @@ def train_one_epoch(
                 )
             )
 
-    avg_loss /= len(train_sampler)
+    avg_loss /= i
     return avg_loss

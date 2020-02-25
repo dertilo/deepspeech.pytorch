@@ -184,7 +184,6 @@ class DeepSpeech(nn.Module):
         self.fc = nn.Sequential(
             SequenceWise(fully_connected),
         )
-        self.inference_softmax = InferenceBatchSoftmax()
 
     def forward(self, x, lengths):
         lengths = lengths.cpu().int()
@@ -204,7 +203,6 @@ class DeepSpeech(nn.Module):
         x = self.fc(x)
         x = x.transpose(0, 1)
         # identity in training mode, softmax in eval mode
-        x = self.inference_softmax(x)
         return x, output_lengths
 
     def get_seq_lens(self, input_length):

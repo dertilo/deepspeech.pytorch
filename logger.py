@@ -64,6 +64,7 @@ class TensorBoardLogger(object):
             "Avg WER": wer,
             "Avg CER": cer,
         }
+        print(values)
         self.tensorboard_writer.add_scalars(self.id, values, epoch)
         if self.log_params:
             for tag, value in parameters():

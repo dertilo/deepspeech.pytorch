@@ -1,4 +1,5 @@
 import argparse
+import torch.nn.functional as F
 
 import numpy as np
 import torch
@@ -76,8 +77,8 @@ def evaluate(
         )
 
         avg_loss += loss_value
-
-        decoded_output, _ = decoder.decode(out, output_sizes)
+        probs = F.softmax(out, dim=-1)
+        decoded_output, _ = decoder.decode(probs, output_sizes)
         target_strings = target_decoder.convert_to_strings(split_targets)
 
         if save_output is not None:
@@ -105,7 +106,7 @@ def evaluate(
                 )
     wer = float(total_wer) / num_tokens
     cer = float(total_cer) / num_chars
-    avg_loss /= len(test_loader)
+    avg_loss /= i
     print("avg valid loss %0.2f" % avg_loss)
     return wer * 100, cer * 100, avg_loss, output_data
 

@@ -47,6 +47,7 @@ class TensorBoardLogger(object):
                          values["cer_results"][epoch]
         values = {
             'Avg Train Loss': loss,
+            'Avg Valid Loss': values['loss_eval_results'][epoch],
             'Avg WER': wer,
             'Avg CER': cer
         }

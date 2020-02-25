@@ -7,7 +7,7 @@ from tqdm import tqdm
 from data.data_loader import SpectrogramDataset, AudioDataLoader
 from decoder import GreedyDecoder
 from opts import add_decoder_args, add_inference_args
-from utils import load_model, reduce_tensor
+from utils import load_model, reduce_tensor, forward_and_calc_loss
 
 parser = argparse.ArgumentParser(description='DeepSpeech transcription')
 parser = add_inference_args(parser)
@@ -40,18 +40,11 @@ def evaluate(test_loader, device, model, decoder, target_decoder, criterion,
             split_targets.append(targets[offset:offset + size])
             offset += size
 
-        out, output_sizes = model(inputs, input_sizes)
+        out,output_sizes, loss, loss_value = forward_and_calc_loss(model, inputs, input_sizes,
+                                                    criterion, targets, target_sizes,
+                                                    device, args.distributed,
+                                                    args.world_size)
 
-        out = out.transpose(0, 1)  # TxNxH
-        float_out = out.float()  # ensure float32 for loss
-        loss = criterion(float_out, targets, output_sizes, target_sizes).to(device)
-        loss = loss / inputs.size(0)  # average the loss by minibatch
-
-        if args.distributed:
-            loss = loss.to(device)
-            loss_value = reduce_tensor(loss, args.world_size).item()
-        else:
-            loss_value = loss.item()
         avg_loss+=loss_value
 
         decoded_output, _ = decoder.decode(out, output_sizes)
@@ -76,6 +69,7 @@ def evaluate(test_loader, device, model, decoder, target_decoder, criterion,
     wer = float(total_wer) / num_tokens
     cer = float(total_cer) / num_chars
     avg_loss/=len(test_loader)
+    print('avg valid loss %0.2f'%avg_loss)
     return wer * 100, cer * 100,avg_loss, output_data
 
 

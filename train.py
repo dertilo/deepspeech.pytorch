@@ -16,7 +16,7 @@ from decoder import GreedyDecoder
 from logger import VisdomLogger, TensorBoardLogger
 from model import DeepSpeech, supported_rnns
 from test import evaluate
-from utils import reduce_tensor, check_loss
+from utils import reduce_tensor, check_loss, forward_and_calc_loss
 
 parser = argparse.ArgumentParser(description='DeepSpeech training')
 parser.add_argument('--train-manifest', metavar='DIR',
@@ -245,18 +245,7 @@ if __name__ == '__main__':
             data_time.update(time.time() - end)
             inputs = inputs.to(device)
 
-            out, output_sizes = model(inputs, input_sizes)
-            out = out.transpose(0, 1)  # TxNxH
-
-            float_out = out.float()  # ensure float32 for loss
-            loss = criterion(float_out, targets, output_sizes, target_sizes).to(device)
-            loss = loss / inputs.size(0)  # average the loss by minibatch
-
-            if args.distributed:
-                loss = loss.to(device)
-                loss_value = reduce_tensor(loss, args.world_size).item()
-            else:
-                loss_value = loss.item()
+            _,_, loss, loss_value = forward_and_calc_loss(model,inputs,input_sizes,criterion,targets,target_sizes,device,args.distributed,args.world_size)
 
             # Check to ensure valid loss was calculated
             valid_loss, error = check_loss(loss, loss_value)
@@ -292,7 +281,7 @@ if __name__ == '__main__':
                                                 loss_results=loss_results,
                                                 wer_results=wer_results, cer_results=cer_results, avg_loss=avg_loss),
                            file_path)
-            del loss, out, float_out
+            del loss
 
         avg_loss /= len(train_sampler)
 

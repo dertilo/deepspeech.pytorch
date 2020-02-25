@@ -136,11 +136,6 @@ parser.add_argument(
     "--save-folder", default="models/", help="Location to save epoch models"
 )
 parser.add_argument(
-    "--model-path",
-    default="models/deepspeech_final.pth",
-    help="Location to save best validation model",
-)
-parser.add_argument(
     "--continue-from", default="", help="Continue from checkpoint model"
 )
 parser.add_argument(

@@ -8,7 +8,7 @@ from tqdm import tqdm
 from data.data_loader import SpectrogramDataset, AudioDataLoader
 from decoder import GreedyDecoder
 from opts import add_decoder_args, add_inference_args
-from utils import load_model, reduce_tensor, forward_and_calc_loss
+from utils import load_model, reduce_tensor, calc_loss
 
 parser = argparse.ArgumentParser(description="DeepSpeech transcription")
 parser = add_inference_args(parser)
@@ -41,8 +41,8 @@ def evaluate(
     model,
     decoder,
     target_decoder,
-    criterion,
-    args,
+    criterion=None,
+    args=None,
     save_output=False,
     verbose=False,
     half=False,
@@ -63,20 +63,20 @@ def evaluate(
         for size in target_sizes:
             split_targets.append(targets[offset : offset + size])
             offset += size
+        out, output_sizes = model(inputs, input_sizes)
+        if criterion is not None:
+            _, loss_value = calc_loss(
+                out,
+                output_sizes,
+                criterion,
+                targets,
+                target_sizes,
+                device,
+                args.distributed,
+                args.world_size,
+            )
+            avg_loss += loss_value
 
-        out, output_sizes, loss, loss_value = forward_and_calc_loss(
-            model,
-            inputs,
-            input_sizes,
-            criterion,
-            targets,
-            target_sizes,
-            device,
-            args.distributed,
-            args.world_size,
-        )
-
-        avg_loss += loss_value
         probs = F.softmax(out, dim=-1)
         decoded_output, _ = decoder.decode(probs, output_sizes)
         target_strings = target_decoder.convert_to_strings(split_targets)
@@ -144,7 +144,7 @@ if __name__ == "__main__":
     test_loader = AudioDataLoader(
         test_dataset, batch_size=args.batch_size, num_workers=args.num_workers
     )
-    wer, cer, output_data = evaluate(
+    wer, cer, avg_loss, output_data = evaluate(
         test_loader=test_loader,
         device=device,
         model=model,

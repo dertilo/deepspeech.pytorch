@@ -21,7 +21,7 @@ from decoder import GreedyDecoder
 from logger import VisdomLogger, TensorBoardLogger
 from model import DeepSpeech, supported_rnns
 from test import evaluate
-from utils import reduce_tensor, check_loss, forward_and_calc_loss, train_one_epoch
+from utils import reduce_tensor, check_loss, calc_loss, train_one_epoch
 
 parser = argparse.ArgumentParser(description="DeepSpeech training")
 parser.add_argument(
@@ -304,8 +304,6 @@ if __name__ == "__main__":
                 start_iter += 1
             log_data = {k:package[k] for k in things_to_monitor}
             best_wer = log_data['wer_results'][start_epoch]
-            if main_proc and args.visdom:  # Add previous scores to visdom graph
-                visdom_logger.load_previous_values(start_epoch, package)
             # if main_proc and args.tensorboard:  # Previous scores to tensorboard logs #TODO: should not be necessary!
             #     tensorboard_logger.load_previous_values(start_epoch, package)
     else:

@@ -46,10 +46,9 @@ def load_model(device, model_path, use_half):
     return model
 
 
-def forward_and_calc_loss(
-    model,
-    inputs,
-    input_sizes,
+def calc_loss(
+    out,
+    output_sizes,
     criterion,
     targets,
     target_sizes,
@@ -57,17 +56,16 @@ def forward_and_calc_loss(
     is_distributed,
     world_size,
 ):
-    out, output_sizes = model(inputs, input_sizes)
     float_out = out.transpose(0, 1).float()  # ensure float32 for loss
     loss = criterion(float_out, targets, output_sizes, target_sizes).to(device)
-    loss = loss / inputs.size(0)  # average the loss by minibatch
+    loss = loss / out.size(0)  # average the loss by minibatch
     if is_distributed:
         loss = loss.to(device)
         loss_value = reduce_tensor(loss, world_size).item()
     else:
         loss_value = loss.item()
 
-    return out, output_sizes, loss, loss_value
+    return loss, loss_value
 
 
 def train_one_epoch(
@@ -94,10 +92,11 @@ def train_one_epoch(
         data_time.update(time.time() - end)
         inputs = inputs.to(device)
 
-        _, _, loss, loss_value = forward_and_calc_loss(
-            model,
-            inputs,
-            input_sizes,
+        out, output_sizes = model(inputs, input_sizes)
+        assert out.size(0) == inputs.size(0)
+        loss, loss_value = calc_loss(
+            out,
+            output_sizes,
             criterion,
             targets,
             target_sizes,

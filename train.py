@@ -21,7 +21,7 @@ from decoder import GreedyDecoder
 from logger import VisdomLogger, TensorBoardLogger
 from model import DeepSpeech, supported_rnns
 from test import evaluate
-from utils import reduce_tensor, check_loss, forward_and_calc_loss
+from utils import reduce_tensor, check_loss, forward_and_calc_loss, train_one_epoch
 
 parser = argparse.ArgumentParser(description="DeepSpeech training")
 parser.add_argument(
@@ -270,13 +270,8 @@ if __name__ == "__main__":
         main_proc = args.rank == 0  # Only the first proc should save models
     save_folder = args.save_folder
     os.makedirs(save_folder, exist_ok=True)  # Ensure save folder exists
-
-    loss_results, cer_results, wer_results = (
-        torch.Tensor(args.epochs),
-        torch.Tensor(args.epochs),
-        torch.Tensor(args.epochs),
-    )
-    loss_eval_results = torch.Tensor(args.epochs)
+    things_to_monitor = ['loss_results','cer_results','wer_results','loss_eval_results']
+    log_data = {k:torch.Tensor(args.epochs) for k in things_to_monitor}
 
     best_wer = None
     if main_proc and args.visdom:
@@ -284,7 +279,7 @@ if __name__ == "__main__":
     if main_proc and args.tensorboard:
         tensorboard_logger = TensorBoardLogger(args.id, args.log_dir, args.log_params)
 
-    avg_loss, start_epoch, start_iter, optim_state, amp_state = 0, 0, 0, None, None
+    start_epoch, start_iter, optim_state, amp_state = 0, 0, None, None
     if args.continue_from:  # Starting from previous model
         print("Loading checkpoint model %s" % args.continue_from)
         package = torch.load(
@@ -307,13 +302,8 @@ if __name__ == "__main__":
                 start_iter = 0
             else:
                 start_iter += 1
-            avg_loss = int(package.get("avg_loss", 0))
-            loss_results, cer_results, wer_results = (
-                package["loss_results"],
-                package["cer_results"],
-                package["wer_results"],
-            )
-            best_wer = wer_results[start_epoch]
+            log_data = {k:package[k] for k in things_to_monitor}
+            best_wer = log_data['wer_results'][start_epoch]
             if main_proc and args.visdom:  # Add previous scores to visdom graph
                 visdom_logger.load_previous_values(start_epoch, package)
             # if main_proc and args.tensorboard:  # Previous scores to tensorboard logs #TODO: should not be necessary!
@@ -406,99 +396,11 @@ if __name__ == "__main__":
     criterion = CTCLoss()
     batch_time = AverageMeter()
     data_time = AverageMeter()
-    losses = AverageMeter()
 
     for epoch in range(start_epoch, args.epochs):
         model.train()
-        end = time.time()
         start_epoch_time = time.time()
-        for i, (data) in enumerate(train_loader, start=start_iter):
-            if i == len(train_sampler):
-                break
-            inputs, targets, input_percentages, target_sizes = data
-            input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
-            # measure data loading time
-            data_time.update(time.time() - end)
-            inputs = inputs.to(device)
-
-            _, _, loss, loss_value = forward_and_calc_loss(
-                model,
-                inputs,
-                input_sizes,
-                criterion,
-                targets,
-                target_sizes,
-                device,
-                args.distributed,
-                args.world_size,
-            )
-
-            # Check to ensure valid loss was calculated
-            valid_loss, error = check_loss(loss, loss_value)
-            if valid_loss:
-                optimizer.zero_grad()
-                # compute gradient
-
-                with amp.scale_loss(loss, optimizer) as scaled_loss:
-                    scaled_loss.backward()
-                torch.nn.utils.clip_grad_norm_(
-                    amp.master_params(optimizer), args.max_norm
-                )
-                optimizer.step()
-            else:
-                print(error)
-                print("Skipping grad update")
-                loss_value = 0
-
-            avg_loss += loss_value
-            losses.update(loss_value, inputs.size(0))
-
-            # measure elapsed time
-            batch_time.update(time.time() - end)
-            end = time.time()
-            if not args.silent and i % 100 == 0:
-                print(
-                    "Epoch: [{0}][{1}/{2}]\t"
-                    "Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t"
-                    "Data {data_time.val:.3f} ({data_time.avg:.3f})\t"
-                    "Loss {loss.val:.4f} ({loss.avg:.4f})\t".format(
-                        (epoch + 1),
-                        (i + 1),
-                        len(train_sampler),
-                        batch_time=batch_time,
-                        data_time=data_time,
-                        loss=losses,
-                    )
-                )
-            if (
-                args.checkpoint_per_batch > 0
-                and i > 0
-                and (i + 1) % args.checkpoint_per_batch == 0
-                and main_proc
-            ):
-                file_path = "%s/deepspeech_checkpoint_epoch_%d_iter_%d.pth" % (
-                    save_folder,
-                    epoch + 1,
-                    i + 1,
-                )
-                print("Saving checkpoint model to %s" % file_path)
-                torch.save(
-                    DeepSpeech.serialize(
-                        model,
-                        optimizer=optimizer,
-                        amp=amp,
-                        epoch=epoch,
-                        iteration=i,
-                        loss_results=loss_results,
-                        wer_results=wer_results,
-                        cer_results=cer_results,
-                        avg_loss=avg_loss,
-                    ),
-                    file_path,
-                )
-            del loss
-
-        avg_loss /= len(train_sampler)
+        avg_loss = train_one_epoch(model,train_loader,start_iter,train_sampler,data_time,batch_time,criterion,args,optimizer,epoch,device)
 
         epoch_time = time.time() - start_epoch_time
         print(
@@ -520,26 +422,18 @@ if __name__ == "__main__":
                 criterion=criterion,
                 args=args,
             )
-        loss_results[epoch] = avg_loss
-        loss_eval_results[epoch] = avg_val_loss
-        wer_results[epoch] = wer
-        cer_results[epoch] = cer
+        log_data['loss_results'][epoch] = avg_loss
+        log_data['loss_eval_results'][epoch] = avg_val_loss
+        log_data['wer_results'][epoch] = wer
+        log_data['cer_results'][epoch] = cer
         print(
             "Validation Summary Epoch: [{0}]\t"
             "Average WER {wer:.3f}\t"
             "Average CER {cer:.3f}\t".format(epoch + 1, wer=wer, cer=cer)
         )
 
-        values = {
-            "loss_results": loss_results,
-            "loss_eval_results": loss_eval_results,
-            "cer_results": cer_results,
-            "wer_results": wer_results,
-        }
-        if args.visdom and main_proc:
-            visdom_logger.update(epoch, values)
         if args.tensorboard and main_proc:
-            tensorboard_logger.update(epoch, values, model.named_parameters())
+            tensorboard_logger.update(epoch, log_data, model.named_parameters())
 
         if main_proc and args.checkpoint:
             file_path = "%s/deepspeech_%d.pth.tar" % (save_folder, epoch + 1)
@@ -549,9 +443,7 @@ if __name__ == "__main__":
                     optimizer=optimizer,
                     amp=amp,
                     epoch=epoch,
-                    loss_results=loss_results,
-                    wer_results=wer_results,
-                    cer_results=cer_results,
+                    log_data=log_data,
                 ),
                 file_path,
             )
@@ -559,23 +451,6 @@ if __name__ == "__main__":
         for g in optimizer.param_groups:
             g["lr"] = g["lr"] / args.learning_anneal
         print("Learning rate annealed to: {lr:.6f}".format(lr=g["lr"]))
-
-        if main_proc and (best_wer is None or best_wer > wer):
-            print("Found better validated model, saving to %s" % args.model_path)
-            torch.save(
-                DeepSpeech.serialize(
-                    model,
-                    optimizer=optimizer,
-                    amp=amp,
-                    epoch=epoch,
-                    loss_results=loss_results,
-                    wer_results=wer_results,
-                    cer_results=cer_results,
-                ),
-                args.model_path,
-            )
-            best_wer = wer
-            avg_loss = 0
 
         if not args.no_shuffle:
             print("Shuffling batches...")

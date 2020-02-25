@@ -7,7 +7,7 @@ from tqdm import tqdm
 from data.data_loader import SpectrogramDataset, AudioDataLoader
 from decoder import GreedyDecoder
 from opts import add_decoder_args, add_inference_args
-from utils import load_model
+from utils import load_model, reduce_tensor
 
 parser = argparse.ArgumentParser(description='DeepSpeech transcription')
 parser = add_inference_args(parser)
@@ -20,9 +20,12 @@ parser.add_argument('--save-output', default=None, help="Saves output of model f
 parser = add_decoder_args(parser)
 
 
-def evaluate(test_loader, device, model, decoder, target_decoder, save_output=False, verbose=False, half=False):
+def evaluate(test_loader, device, model, decoder, target_decoder, criterion,
+             args,
+             save_output=False, verbose=False, half=False):
     model.eval()
     total_cer, total_wer, num_tokens, num_chars = 0, 0, 0, 0
+    avg_loss = 0
     output_data = []
     for i, (data) in tqdm(enumerate(test_loader), total=len(test_loader)):
         inputs, targets, input_percentages, target_sizes = data
@@ -38,6 +41,18 @@ def evaluate(test_loader, device, model, decoder, target_decoder, save_output=Fa
             offset += size
 
         out, output_sizes = model(inputs, input_sizes)
+
+        out = out.transpose(0, 1)  # TxNxH
+        float_out = out.float()  # ensure float32 for loss
+        loss = criterion(float_out, targets, output_sizes, target_sizes).to(device)
+        loss = loss / inputs.size(0)  # average the loss by minibatch
+
+        if args.distributed:
+            loss = loss.to(device)
+            loss_value = reduce_tensor(loss, args.world_size).item()
+        else:
+            loss_value = loss.item()
+        avg_loss+=loss_value
 
         decoded_output, _ = decoder.decode(out, output_sizes)
         target_strings = target_decoder.convert_to_strings(split_targets)
@@ -60,7 +75,8 @@ def evaluate(test_loader, device, model, decoder, target_decoder, save_output=Fa
                       "CER:", float(cer_inst) / len(reference.replace(' ', '')), "\n")
     wer = float(total_wer) / num_tokens
     cer = float(total_cer) / num_chars
-    return wer * 100, cer * 100, output_data
+    avg_loss/=len(test_loader)
+    return wer * 100, cer * 100,avg_loss, output_data
 
 
 if __name__ == '__main__':

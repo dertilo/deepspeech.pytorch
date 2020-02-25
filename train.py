@@ -133,6 +133,8 @@ if __name__ == '__main__':
 
     loss_results, cer_results, wer_results = torch.Tensor(args.epochs), torch.Tensor(args.epochs), torch.Tensor(
         args.epochs)
+    loss_eval_results = torch.Tensor(args.epochs)
+
     best_wer = None
     if main_proc and args.visdom:
         visdom_logger = VisdomLogger(args.id, args.epochs)
@@ -301,12 +303,15 @@ if __name__ == '__main__':
 
         start_iter = 0  # Reset start iteration for next epoch
         with torch.no_grad():
-            wer, cer, output_data = evaluate(test_loader=test_loader,
+            wer, cer, avg_val_loss,output_data = evaluate(test_loader=test_loader,
                                              device=device,
                                              model=model,
                                              decoder=decoder,
-                                             target_decoder=decoder)
+                                             target_decoder=decoder,
+                                             criterion=criterion,args=args
+                                                          )
         loss_results[epoch] = avg_loss
+        loss_eval_results[epoch] = avg_val_loss
         wer_results[epoch] = wer
         cer_results[epoch] = cer
         print('Validation Summary Epoch: [{0}]\t'
@@ -316,6 +321,7 @@ if __name__ == '__main__':
 
         values = {
             'loss_results': loss_results,
+            'loss_eval_results': loss_eval_results,
             'cer_results': cer_results,
             'wer_results': wer_results
         }

@@ -52,22 +52,26 @@ if __name__ == "__main__":
 
     base_path = os.path.join(os.environ["HOME"], "data/asr_data/SPANISH")
 
-    split_type = "train"
-    wav_dir = os.path.join(base_path, split_type, "wav")
-    txt_dir = os.path.join(base_path, split_type, "txt")
-    Path(wav_dir).mkdir(parents=True, exist_ok=True)
-    Path(txt_dir).mkdir(parents=True, exist_ok=True)
+    for split_type in ["train",'eval']:
+        wav_dir = os.path.join(base_path, split_type, "wav")
+        txt_dir = os.path.join(base_path, split_type, "txt")
 
-    def funfun(audio_file_text):
-        audio_file, text = audio_file_text
-        audio_file = base_path + audio_file
-        process_example(wav_dir, txt_dir, audio_file, text)
+        if not os.path.isdir(wav_dir):
+            Path(wav_dir).mkdir(parents=True, exist_ok=True)
+            Path(txt_dir).mkdir(parents=True, exist_ok=True)
 
-    with multiprocessing.Pool(processes=50) as p:
-        result = list(
-            p.imap_unordered(
-                funfun, tqdm(read_jsonl(base_path + "/spanish_%s.jsonl" % split_type)),
-            )
-        )
+            def funfun(audio_file_text):
+                audio_file, text = audio_file_text
+                audio_file = base_path + audio_file
+                process_example(wav_dir, txt_dir, audio_file, text)
 
-    create_manifest(wav_dir, "spanish_" + split_type + "_manifest.csv", 1, 30)
+            with multiprocessing.Pool(processes=50) as p:
+                result = list(
+                    p.imap_unordered(
+                        funfun, tqdm(read_jsonl(base_path + "/spanish_%s.jsonl" % split_type)),
+                    )
+                )
+
+        manifest_file = "spanish_" + split_type + "_manifest.csv"
+        if not os.path.isfile(manifest_file):
+            create_manifest(wav_dir, manifest_file, 1, 30)

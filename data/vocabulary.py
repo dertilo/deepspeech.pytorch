@@ -16,7 +16,7 @@ def build_vocabulary(
     counter = Counter((c.lower() for t in tqdm(text_g) for c in t))
     vocab = counter.most_common(200)
     write_json(vocab_file.replace('.json','_freqs.json'),[(c,f) for c, f in vocab if f > min_freq])
-    write_json(vocab_file, [c for c, f in vocab if f > min_freq])
+    write_json(vocab_file, ['_']+[c for c, f in vocab if f > min_freq])
 
 
 if __name__ == "__main__":

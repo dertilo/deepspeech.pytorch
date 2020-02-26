@@ -219,7 +219,7 @@ class DeepSpeech(nn.Module):
         return seq_len.int()
 
     @classmethod
-    def load_model(cls, path):
+    def load_model(cls, path)->'DeepSpeech':
         package = torch.load(path, map_location=lambda storage, loc: storage)
         model = cls(rnn_hidden_size=package['hidden_size'],
                     nb_layers=package['hidden_layers'],

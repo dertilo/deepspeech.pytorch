@@ -5,6 +5,8 @@ import warnings
 from tqdm import tqdm
 
 from data_related.data_utils import write_json
+from data_related.vocabulary import BLANK_CHAR
+from model import DeepSpeech
 from opts import add_decoder_args, add_inference_args
 from transcribe import transcribe
 from utils import load_model
@@ -49,7 +51,7 @@ if __name__ == "__main__":
     arg_parser = add_decoder_args(arg_parser)
     args = arg_parser.parse_args()
     device = torch.device("cuda" if args.cuda else "cpu")
-    model = load_model(device, args.model_path, args.half)
+    model:DeepSpeech = load_model(device, args.model_path, args.half)
 
     if args.decoder == "beam":
         from decoder import BeamCTCDecoder
@@ -65,7 +67,7 @@ if __name__ == "__main__":
             num_processes=args.lm_workers,
         )
     else:
-        decoder = GreedyDecoder(model.labels, blank_index=len(model.labels)-1)
+        decoder = GreedyDecoder(model.labels, blank_index=model.labels.index(BLANK_CHAR))
 
     spect_parser = SpectrogramParser(model.audio_conf, normalize=True)
 

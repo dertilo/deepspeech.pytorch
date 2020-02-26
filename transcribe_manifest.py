@@ -1,6 +1,8 @@
 import argparse
 import gzip
 import warnings
+
+from data.utils import write_json
 from opts import add_decoder_args, add_inference_args
 from transcribe import transcribe
 from utils import load_model
@@ -77,16 +79,19 @@ if __name__ == "__main__":
         candidate_idx = 0
         return [x[candidate_idx] for x in decoded_output][0]
 
-    examples_g = (
-        l.replace(
-            "/beegfs/home/users/t/tilo-himmelsbach/SPEECH/deepspeech.pytorch/", ""
-        ).split(",")
-        for l in read_lines(args.manifest, limit=10)
-    )
+    def fix_path(l):
+        if "libri" in l:
+            path = l.replace(
+                "/beegfs/home/users/t/tilo-himmelsbach/SPEECH/deepspeech.pytorch/", ""
+            )
+        else:
+            path = l
+        return path
+
+    examples_g = (fix_path(l).split(",") for l in read_lines(args.manifest, limit=10))
     g = (
         (do_transcribe(audio_file), next(iter(read_lines(text_file))))
         for audio_file, text_file in examples_g
     )
 
-    for d in g:
-        print(d)
+    write_json('transcribed.json',list(g))

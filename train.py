@@ -166,6 +166,12 @@ parser.add_argument(
     type=float,
 )
 parser.add_argument(
+    "--feature-type",
+    default='stft',
+    choices=['stft','mfcc'],
+    type=str,
+)
+parser.add_argument(
     "--no-shuffle",
     dest="no_shuffle",
     action="store_true",
@@ -304,6 +310,7 @@ if __name__ == "__main__":
             noise_dir=args.noise_dir,
             noise_prob=args.noise_prob,
             noise_levels=(args.noise_min, args.noise_max),
+            feature_type = args.feature_type,
         )
 
         rnn_type = args.rnn_type.lower()

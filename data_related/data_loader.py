@@ -2,6 +2,7 @@ import os
 import subprocess
 from tempfile import NamedTemporaryFile
 
+import torchaudio
 from torch.distributed import get_rank
 from torch.distributed import get_world_size
 from torch.utils.data.sampler import Sampler
@@ -15,20 +16,26 @@ import math
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
 
-windows = {'hamming': scipy.signal.hamming, 'hann': scipy.signal.hann, 'blackman': scipy.signal.blackman,
-           'bartlett': scipy.signal.bartlett}
+windows = {
+    "hamming": scipy.signal.hamming,
+    "hann": scipy.signal.hann,
+    "blackman": scipy.signal.blackman,
+    "bartlett": scipy.signal.bartlett,
+}
 
-SAMPLE_RATE=16_000
+SAMPLE_RATE = 16_000
+
 
 def load_audio(path):
     sample_rate, sound = read(path)
-    sound = sound.astype('float32') / 32767  # normalize audio
+    sound = sound.astype("float32") / 32767  # normalize audio
     if len(sound.shape) > 1:
         if sound.shape[1] == 1:
             sound = sound.squeeze()
         else:
             sound = sound.mean(axis=1)  # multiple channels, average
     return sound
+
 
 # def load_audio(path):
 #     sound, sample_rate = torchaudio.load(path, normalization=True)
@@ -61,10 +68,7 @@ class AudioParser(object):
 
 
 class NoiseInjection(object):
-    def __init__(self,
-                 path=None,
-                 sample_rate=16000,
-                 noise_levels=(0, 0.5)):
+    def __init__(self, path=None, sample_rate=SAMPLE_RATE, noise_levels=(0, 0.5)):
         """
         Adds noise to an input signal with specific SNR. Higher the noise level, the more noise added.
         Modified code from https://github.com/willfrey/audio/blob/master/torchaudio/transforms.py
@@ -103,16 +107,28 @@ class SpectrogramParser(AudioParser):
         :param augment(default False):  Apply random tempo and gain perturbations
         """
         super(SpectrogramParser, self).__init__()
-        self.window_stride = audio_conf['window_stride']
-        self.window_size = audio_conf['window_size']
-        self.sample_rate = audio_conf['sample_rate']
-        self.window = windows.get(audio_conf['window'], windows['hamming'])
+        self.feature_type = audio_conf["feature_type"]
+        self.window_stride = audio_conf["window_stride"]
+        self.window_size = audio_conf["window_size"]
+        self.sample_rate = audio_conf["sample_rate"]
+        self.window = windows.get(audio_conf["window"], windows["hamming"])
         self.normalize = normalize
         self.augment = augment
-        self.noiseInjector = NoiseInjection(audio_conf['noise_dir'], self.sample_rate,
-                                            audio_conf['noise_levels']) if audio_conf.get(
-            'noise_dir') is not None else None
-        self.noise_prob = audio_conf.get('noise_prob')
+        self.noiseInjector = (
+            NoiseInjection(
+                audio_conf["noise_dir"], self.sample_rate, audio_conf["noise_levels"]
+            )
+            if audio_conf.get("noise_dir") is not None
+            else None
+        )
+        self.noise_prob = audio_conf.get("noise_prob")
+        if self.feature_type == "mfcc":
+            FEATURE_DIM = 40
+            self.mfcc = torchaudio.transforms.MFCC(
+                sample_rate=SAMPLE_RATE, n_mfcc=FEATURE_DIM
+            )
+        elif self.feature_type == 'mel':
+            self.mel = torchaudio.transforms.MelSpectrogram(sample_rate=SAMPLE_RATE)
 
     def parse_audio(self, audio_path):
         if self.augment:
@@ -123,12 +139,28 @@ class SpectrogramParser(AudioParser):
             add_noise = np.random.binomial(1, self.noise_prob)
             if add_noise:
                 y = self.noiseInjector.inject_noise(y)
+        if self.feature_type == "mfcc":
+            feat = self.mfcc.forward(torch.from_numpy(y).unsqueeze(0)).data.squeeze(0)
+        elif self.feature_type == "stft":
+            feat = self._calc_stft(y)
+        elif self.feature_type == 'mel':
+            feat = self.mel.forward(torch.from_numpy(y).unsqueeze(0)).data.squeeze(0)
+        else:
+            assert False
+        return feat
+
+    def _calc_stft(self, y):
         n_fft = int(self.sample_rate * self.window_size)
         win_length = n_fft
         hop_length = int(self.sample_rate * self.window_stride)
         # STFT
-        D = librosa.stft(y, n_fft=n_fft, hop_length=hop_length,
-                         win_length=win_length, window=self.window)
+        D = librosa.stft(
+            y,
+            n_fft=n_fft,
+            hop_length=hop_length,
+            win_length=win_length,
+            window=self.window,
+        )
         spect, phase = librosa.magphase(D)
         # S = log(S+1)
         spect = np.log1p(spect)
@@ -138,7 +170,6 @@ class SpectrogramParser(AudioParser):
             std = spect.std()
             spect.add_(-mean)
             spect.div_(std)
-
         return spect
 
     def parse_transcript(self, transcript_path):
@@ -146,7 +177,9 @@ class SpectrogramParser(AudioParser):
 
 
 class SpectrogramDataset(Dataset, SpectrogramParser):
-    def __init__(self, audio_conf, manifest_filepath, labels, normalize=False, augment=False):
+    def __init__(
+        self, audio_conf, manifest_filepath, labels, normalize=False, augment=False
+    ):
         """
         Dataset that loads tensors via a csv containing file paths to audio files and transcripts separated by
         a comma. Each new line is a different sample. Example below:
@@ -163,12 +196,15 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
         with open(manifest_filepath) as f:
             audio_text_files = f.readlines()
 
-        if ('libri' in manifest_filepath): # TODO(tilo): just too lazy to rebuild the csvs
+        if (
+            "libri" in manifest_filepath
+        ):  # TODO(tilo): just too lazy to rebuild the csvs
+
             def fix_path(wav_file, txt_file):
-                if 'libri_train100_manifest.csv'==manifest_filepath:
-                    base_path = 'LibriSpeech_train_100'
+                if "libri_train100_manifest.csv" == manifest_filepath:
+                    base_path = "LibriSpeech_train_100"
                 else:
-                    base_path = 'LibriSpeech_dataset'
+                    base_path = "LibriSpeech_dataset"
 
                 def splitit(s):
                     tmp = s.split(base_path)
@@ -177,13 +213,16 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
                         assert False
                     _, f = tmp
                     return f
-                wav_file = '/'.join([base_path, splitit(wav_file)])
-                txt_file = '/'.join([base_path, splitit(txt_file)])
+
+                wav_file = "/".join([base_path, splitit(wav_file)])
+                txt_file = "/".join([base_path, splitit(txt_file)])
                 return wav_file, txt_file
 
-            audio_text_files = [fix_path(*x.strip().split(',')) for x in audio_text_files]
+            audio_text_files = [
+                fix_path(*x.strip().split(",")) for x in audio_text_files
+            ]
         else:
-            audio_text_files = [x.strip().split(',') for x in audio_text_files]
+            audio_text_files = [x.strip().split(",") for x in audio_text_files]
 
         self.audio_text_files = audio_text_files
         self.size = len(audio_text_files)
@@ -197,9 +236,11 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
         return spect, transcript
 
     def parse_transcript(self, transcript_path):
-        with open(transcript_path, 'r', encoding='utf8') as f:
-            transcript = f.read().replace('\n', '')
-        transcript = list(filter(None, [self.labels_map.get(x) for x in list(transcript)])) # TODO(tilo) like this it erases unknown letters
+        with open(transcript_path, "r", encoding="utf8") as f:
+            transcript = f.read().replace("\n", "")
+        transcript = list(
+            filter(None, [self.labels_map.get(x) for x in list(transcript)])
+        )  # TODO(tilo) like this it erases unknown letters
         # transcript = [self.labels_map.get(x,UNK) for x in list(transcript)] # TODO(tilo) better like this?
         return transcript
 
@@ -250,11 +291,11 @@ class BucketingSampler(Sampler):
         super(BucketingSampler, self).__init__(data_source)
         self.data_source = data_source
         ids = list(range(0, len(data_source)))
-        self.bins = [ids[i:i + batch_size] for i in range(0, len(ids), batch_size)]
+        self.bins = [ids[i : i + batch_size] for i in range(0, len(ids), batch_size)]
 
     def __iter__(self):
         for ids in self.bins:
-            np.random.shuffle(ids) # TODO(tilo): why should one shuffle here?
+            np.random.shuffle(ids)  # TODO(tilo): why should one shuffle here?
             yield ids
 
     def __len__(self):
@@ -277,7 +318,9 @@ class DistributedBucketingSampler(Sampler):
         self.data_source = data_source
         self.ids = list(range(0, len(data_source)))
         self.batch_size = batch_size
-        self.bins = [self.ids[i:i + batch_size] for i in range(0, len(self.ids), batch_size)]
+        self.bins = [
+            self.ids[i : i + batch_size] for i in range(0, len(self.ids), batch_size)
+        ]
         self.num_replicas = num_replicas
         self.rank = rank
         self.num_samples = int(math.ceil(len(self.bins) * 1.0 / self.num_replicas))
@@ -286,9 +329,11 @@ class DistributedBucketingSampler(Sampler):
     def __iter__(self):
         offset = self.rank
         # add extra samples to make it evenly divisible
-        bins = self.bins + self.bins[:(self.total_size - len(self.bins))]
+        bins = self.bins + self.bins[: (self.total_size - len(self.bins))]
         assert len(bins) == self.total_size
-        samples = bins[offset::self.num_replicas]  # Get every Nth bin, starting from rank
+        samples = bins[
+            offset :: self.num_replicas
+        ]  # Get every Nth bin, starting from rank
         return iter(samples)
 
     def __len__(self):
@@ -303,7 +348,7 @@ class DistributedBucketingSampler(Sampler):
 
 
 def get_audio_length(path):
-    output = subprocess.check_output(['soxi -D \"%s\"' % path.strip()], shell=True)
+    output = subprocess.check_output(['soxi -D "%s"' % path.strip()], shell=True)
     return float(output)
 
 
@@ -313,9 +358,9 @@ def audio_with_sox(path, sample_rate, start_time, end_time):
     """
     with NamedTemporaryFile(suffix=".wav") as tar_file:
         tar_filename = tar_file.name
-        sox_params = "sox \"{}\" -r {} -c 1 -b 16 -e si {} trim {} ={} >/dev/null 2>&1".format(path, sample_rate,
-                                                                                               tar_filename, start_time,
-                                                                                               end_time)
+        sox_params = 'sox "{}" -r {} -c 1 -b 16 -e si {} trim {} ={} >/dev/null 2>&1'.format(
+            path, sample_rate, tar_filename, start_time, end_time
+        )
         os.system(sox_params)
         y = load_audio(tar_filename)
         return y
@@ -327,17 +372,23 @@ def augment_audio_with_sox(path, sample_rate, tempo, gain):
     """
     with NamedTemporaryFile(suffix=".wav") as augmented_file:
         augmented_filename = augmented_file.name
-        sox_augment_params = ["tempo", "{:.3f}".format(tempo), "gain", "{:.3f}".format(gain)]
-        sox_params = "sox \"{}\" -r {} -c 1 -b 16 -e si {} {} >/dev/null 2>&1".format(path, sample_rate,
-                                                                                      augmented_filename,
-                                                                                      " ".join(sox_augment_params))
+        sox_augment_params = [
+            "tempo",
+            "{:.3f}".format(tempo),
+            "gain",
+            "{:.3f}".format(gain),
+        ]
+        sox_params = 'sox "{}" -r {} -c 1 -b 16 -e si {} {} >/dev/null 2>&1'.format(
+            path, sample_rate, augmented_filename, " ".join(sox_augment_params)
+        )
         os.system(sox_params)
         y = load_audio(augmented_filename)
         return y
 
 
-def load_randomly_augmented_audio(path, sample_rate=16000, tempo_range=(0.85, 1.15),
-                                  gain_range=(-6, 8)):
+def load_randomly_augmented_audio(
+    path, sample_rate=SAMPLE_RATE, tempo_range=(0.85, 1.15), gain_range=(-6, 8)
+):
     """
     Picks tempo and gain uniformly, applies it to the utterance by using sox utility.
     Returns the augmented utterance.
@@ -346,6 +397,7 @@ def load_randomly_augmented_audio(path, sample_rate=16000, tempo_range=(0.85, 1.
     tempo_value = np.random.uniform(low=low_tempo, high=high_tempo)
     low_gain, high_gain = gain_range
     gain_value = np.random.uniform(low=low_gain, high=high_gain)
-    audio = augment_audio_with_sox(path=path, sample_rate=sample_rate,
-                                   tempo=tempo_value, gain=gain_value)
+    audio = augment_audio_with_sox(
+        path=path, sample_rate=sample_rate, tempo=tempo_value, gain=gain_value
+    )
     return audio

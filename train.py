@@ -128,7 +128,7 @@ parser.add_argument(
     "--id", default="Deepspeech training", help="Identifier for visdom/tensorboard run"
 )
 parser.add_argument(
-    "--save-folder", default="models/", help="Location to save epoch models"
+    "--save-folder", default="checkpoints", help="Location to save epoch models"
 )
 parser.add_argument(
     "--continue-from", default="", help="Continue from checkpoint model"
@@ -427,7 +427,7 @@ if __name__ == "__main__":
             tensorboard_logger.update(epoch, log_data, model.named_parameters())
 
         if main_proc and args.checkpoint:
-            file_path = "%s/deepspeech_%d.pth.tar" % (save_folder, epoch + 1)
+            file_path = "%s/deepspeech_%d.pth.tar" % (os.path.join(save_folder,args.id), epoch + 1)
             torch.save(
                 DeepSpeech.serialize(
                     model,

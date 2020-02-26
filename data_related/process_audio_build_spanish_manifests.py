@@ -6,7 +6,7 @@ import gzip
 
 from tqdm import tqdm
 
-from data.utils import read_jsonl
+from data_related.utils import read_jsonl
 from utils import create_manifest
 
 SAMPLE_RATE = 16_000

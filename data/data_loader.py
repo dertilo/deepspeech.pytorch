@@ -161,7 +161,7 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
         :param augment(default False):  Apply random tempo and gain perturbations
         """
         with open(manifest_filepath) as f:
-            ids = f.readlines()
+            audio_text_files = f.readlines()
 
         if ('libri' in manifest_filepath): # TODO(tilo): just too lazy to rebuild the csvs
             def fix_path(wav_file, txt_file):
@@ -181,26 +181,26 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
                 txt_file = '/'.join([base_path, splitit(txt_file)])
                 return wav_file, txt_file
 
-            ids = [fix_path(*x.strip().split(',')) for x in ids]
+            audio_text_files = [fix_path(*x.strip().split(',')) for x in audio_text_files]
         else:
-            ids = [x.strip().split(',') for x in ids]
+            audio_text_files = [x.strip().split(',') for x in audio_text_files]
 
-        self.ids = ids
-        self.size = len(ids)
+        self.audio_text_files = audio_text_files
+        self.size = len(audio_text_files)
         self.labels_map = dict([(labels[i], i) for i in range(len(labels))])
         super(SpectrogramDataset, self).__init__(audio_conf, normalize, augment)
 
     def __getitem__(self, index):
-        sample = self.ids[index]
-        audio_path, transcript_path = sample[0], sample[1]
-        spect = self.parse_audio(audio_path)
-        transcript = self.parse_transcript(transcript_path)
+        audio_file, text_file = self.audio_text_files[index]
+        spect = self.parse_audio(audio_file)
+        transcript = self.parse_transcript(text_file)
         return spect, transcript
 
     def parse_transcript(self, transcript_path):
-        with open(transcript_path, 'r', encoding='utf8') as transcript_file:
-            transcript = transcript_file.read().replace('\n', '')
-        transcript = list(filter(None, [self.labels_map.get(x) for x in list(transcript)]))
+        with open(transcript_path, 'r', encoding='utf8') as f:
+            transcript = f.read().replace('\n', '')
+        transcript = list(filter(None, [self.labels_map.get(x) for x in list(transcript)])) # TODO(tilo) like this it erases unknown letters
+        # transcript = [self.labels_map.get(x,UNK) for x in list(transcript)] # TODO(tilo) better like this?
         return transcript
 
     def __len__(self):
@@ -254,7 +254,7 @@ class BucketingSampler(Sampler):
 
     def __iter__(self):
         for ids in self.bins:
-            np.random.shuffle(ids)
+            np.random.shuffle(ids) # TODO(tilo): why should one shuffle here?
             yield ids
 
     def __len__(self):

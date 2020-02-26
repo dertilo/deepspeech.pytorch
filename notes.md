@@ -11,14 +11,6 @@
 ### on hpc
     module load singularity/2.5.2
     singularity shell --nv deepspeech.sif
-#### single gpu     
-    python train.py --rnn-type lstm --hidden-size 1024 --hidden-layers 5  --train-manifest libri_train_manifest.csv --val-manifest libri_val_manifest.csv --epochs 60 --num-workers 16 --cuda  --learning-anneal 1.01 --batch-size 64 --no-sortaGrad --tensorboard  --log-dir tensorboard_logdir --opt-level O1 --loss-scale 1 --id libri --checkpoint --save-folder librispeech_save/ --model-path librispeech/deepspeech_final.pth
-#### multi gpu
-
-    python -m multiproc train.py --log-dir tensorboard_logdir/libri_full --hidden-layers 5 --opt-level O1 --loss-scale 1 --id libri_full --checkpoint --save-folder librispeech_save/full --model-path librispeech_models/libri_full_final.pth
-    
-    python -m multiproc train.py --train-manifest ~/data/asr_data/SPANISH/spanish_train_some.csv --val-manifest ~/data/asr_data/SPANISH/spanish_train_some.csv --hidden-layers 2 --opt-level O1 --loss-scale 1 --id spanish --checkpoint --save-folder librispeech_save/2layers_spanish --model-path librispeech_models/deepspeech_2layers_spanish_final.pth
-    --log-dir tensorboard_logdir/spanish
     
 #### evaluation
     python test.py --model-path librispeech_pretrained_v2.pth --test-manifest data/libri_test_clean.csv --cuda --half
@@ -42,6 +34,25 @@ for debug
     
     python -m multiproc train.py --log-dir tensorboard_logdir/debug --train-manifest libri_train_manifest_some.csv --val-manifest libri_train_manifest_some.csv --hidden-layers 2 --opt-level O1 --loss-scale 1 --id debug --checkpoint --save-folder librispeech_save/debug --model-path librispeech_models/deepspeech_debug.pth
     python train.py --log-dir tensorboard_logdir/debug --train-manifest libri_train_manifest_some.csv --val-manifest libri_train_manifest_some.csv --hidden-layers 2 --opt-level O1 --loss-scale 1 --id debug --checkpoint --save-folder librispeech_save/debug --model-path librispeech_models/deepspeech_debug.pth
+
+### spanish
+* debug
+    python -m multiproc train.py --labels-path spanish_vocab.json --train-manifest spanish_some.csv --val-manifest spanish_some.csv --id debug --save-folder librispeech_save/debug
+
+* full
+ 
+    python -m multiproc train.py --labels-path spanish_vocab.json --train-manifest spanish_train_manifest.csv --val-manifest spanish_eval_manifest.csv --id spanish --save-folder checkpoints/spanish
+
+* mel
+ 
+    python -m multiproc train.py --feature-type mel --labels-path spanish_vocab.json --train-manifest spanish_train_manifest.csv --val-manifest spanish_eval_manifest.csv --id spanish_mel --save-folder checkpoints/spanish_mel
+* augmented
+
+    python -m multiproc train.py --augment --labels-path spanish_vocab.json --train-manifest spanish_train_manifest.csv --val-manifest spanish_eval_manifest.csv --id spanish_augmented --save-folder checkpoints/spanish_augmented
+
+#### transcribing
+    
+    python transcribe_manifest.py --model-path librispeech_save/spanish/deepspeech_2.pth.tar --manifest spanish_eval_manifest.csv
 
 # TODO
 * librispeech-clean-100 should lead to ~30% WER!! 

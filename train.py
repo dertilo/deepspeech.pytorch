@@ -168,7 +168,7 @@ parser.add_argument(
 parser.add_argument(
     "--feature-type",
     default='stft',
-    choices=['stft','mfcc'],
+    choices=['stft','mfcc','mel'],
     type=str,
 )
 parser.add_argument(

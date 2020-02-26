@@ -18,9 +18,9 @@ parser.add_argument(
     help="path to validation manifest csv",
     default="data/test_manifest.csv",
 )
-parser.add_argument("--batch-size", default=20, type=int, help="Batch size for testing")
+parser.add_argument("--batch-size", default=64, type=int, help="Batch size for testing")
 parser.add_argument(
-    "--num-workers", default=4, type=int, help="Number of workers used in dataloading"
+    "--num-workers", default=16, type=int, help="Number of workers used in dataloading"
 )
 parser.add_argument(
     "--verbose",
@@ -107,7 +107,7 @@ def evaluate(
     wer = float(total_wer) / num_tokens
     cer = float(total_cer) / num_chars
     avg_loss /= i
-    print("avg valid loss %0.2f" % avg_loss)
+    # print("avg valid loss %0.2f" % avg_loss)
     return wer * 100, cer * 100, avg_loss, output_data
 
 

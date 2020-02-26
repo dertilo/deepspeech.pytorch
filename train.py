@@ -17,6 +17,7 @@ from data.data_loader import (
     BucketingSampler,
     DistributedBucketingSampler,
 )
+from data.utils import read_jsonl
 from decoder import GreedyDecoder
 from logger import VisdomLogger, TensorBoardLogger
 from model import DeepSpeech, supported_rnns
@@ -101,17 +102,9 @@ parser.add_argument(
 parser.add_argument(
     "--checkpoint",
     dest="checkpoint",
+    default=True,
     action="store_true",
     help="Enables checkpoint saving of model",
-)
-parser.add_argument(
-    "--checkpoint-per-batch",
-    default=0,
-    type=int,
-    help="Save checkpoint per batch. 0 means never save",
-)
-parser.add_argument(
-    "--visdom", dest="visdom", action="store_true", help="Turn on visdom graphing"
 )
 parser.add_argument(
     "--tensorboard",
@@ -209,9 +202,9 @@ parser.add_argument(
     help="If using distributed parallel for multi-gpu, sets the GPU for the process",
 )
 parser.add_argument("--seed", default=123456, type=int, help="Seed to generators")
-parser.add_argument("--opt-level", type=str)
+parser.add_argument("--opt-level",default='O1' , type=str)
 parser.add_argument("--keep-batchnorm-fp32", type=str, default=None)
-parser.add_argument("--loss-scale", type=str, default=None)
+parser.add_argument("--loss-scale", default = 1 ,type=str)
 
 torch.manual_seed(123456)
 torch.cuda.manual_seed_all(123456)
@@ -268,9 +261,6 @@ if __name__ == "__main__":
     things_to_monitor = ['loss_results','cer_results','wer_results','loss_eval_results']
     log_data = {k:torch.Tensor(args.epochs) for k in things_to_monitor}
 
-    best_wer = None
-    if main_proc and args.visdom:
-        visdom_logger = VisdomLogger(args.id, args.epochs)
     if main_proc and args.tensorboard:
         tensorboard_logger = TensorBoardLogger(args.id, args.log_dir, args.log_params)
 
@@ -302,8 +292,7 @@ if __name__ == "__main__":
             # if main_proc and args.tensorboard:  # Previous scores to tensorboard logs #TODO: should not be necessary!
             #     tensorboard_logger.load_previous_values(start_epoch, package)
     else:
-        with open(args.labels_path) as label_file:
-            labels = str("".join(json.load(label_file)))
+        labels = str("".join(next(iter(read_jsonl(args.labels_path)))))
 
         audio_conf = dict(
             sample_rate=args.sample_rate,

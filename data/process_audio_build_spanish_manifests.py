@@ -6,21 +6,10 @@ import gzip
 
 from tqdm import tqdm
 
+from data.utils import read_jsonl
 from utils import create_manifest
 
 SAMPLE_RATE = 16_000
-
-
-def read_jsonl(file, mode="b", limit=None, num_to_skip=0):
-    assert any([mode == m for m in ["b", "t"]])
-    with gzip.open(file, mode="r" + mode) if file.endswith(".gz") else open(
-        file, mode="rb"
-    ) as f:
-        [next(f) for _ in range(num_to_skip)]
-        for k, line in enumerate(f):
-            if limit and (k >= limit):
-                break
-            yield json.loads(line.decode("utf-8") if mode == "b" else line)
 
 
 def _preprocess_transcript(phrase):

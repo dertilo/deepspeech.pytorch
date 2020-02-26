@@ -10,7 +10,7 @@ from decoder import GreedyDecoder
 
 import torch
 
-from data.data_loader import SpectrogramParser
+from data_related.data_loader import SpectrogramParser
 import os.path
 import json
 

@@ -2,7 +2,9 @@ import argparse
 import gzip
 import warnings
 
-from data.utils import write_json
+from tqdm import tqdm
+
+from data_related.data_utils import write_json
 from opts import add_decoder_args, add_inference_args
 from transcribe import transcribe
 from utils import load_model
@@ -14,7 +16,7 @@ from decoder import GreedyDecoder
 
 import torch
 
-from data.data_loader import SpectrogramParser
+from data_related.data_loader import SpectrogramParser
 import os.path
 import json
 
@@ -63,7 +65,7 @@ if __name__ == "__main__":
             num_processes=args.lm_workers,
         )
     else:
-        decoder = GreedyDecoder(model.labels, blank_index=model.labels.index("_"))
+        decoder = GreedyDecoder(model.labels, blank_index=len(model.labels)-1)
 
     spect_parser = SpectrogramParser(model.audio_conf, normalize=True)
 
@@ -91,7 +93,7 @@ if __name__ == "__main__":
     examples_g = (fix_path(l).split(",") for l in read_lines(args.manifest, limit=10))
     g = (
         (do_transcribe(audio_file), next(iter(read_lines(text_file))))
-        for audio_file, text_file in examples_g
+        for audio_file, text_file in tqdm(examples_g)
     )
 
     write_json('transcribed.json',list(g))

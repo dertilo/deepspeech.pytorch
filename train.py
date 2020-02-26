@@ -9,15 +9,17 @@ import torch.distributed as dist
 import torch.utils.data.distributed
 from apex import amp
 from apex.parallel import DistributedDataParallel
+
+from data_related.vocabulary import BLANK_CHAR
 from warpctc_pytorch import CTCLoss
 
-from data.data_loader import (
+from data_related.data_loader import (
     AudioDataLoader,
     SpectrogramDataset,
     BucketingSampler,
     DistributedBucketingSampler,
 )
-from data.utils import read_jsonl
+from data_related.data_utils import read_jsonl
 from decoder import GreedyDecoder
 from logger import VisdomLogger, TensorBoardLogger
 from model import DeepSpeech, supported_rnns
@@ -375,7 +377,7 @@ if __name__ == "__main__":
     print(model)
     print("Number of parameters: %d" % DeepSpeech.get_param_size(model))
 
-    criterion = CTCLoss()
+    criterion = CTCLoss(blank=labels.index(BLANK_CHAR))
     batch_time = AverageMeter()
     data_time = AverageMeter()
 

@@ -4,7 +4,7 @@ from tempfile import NamedTemporaryFile
 import torch
 from flask import Flask, request, jsonify
 import logging
-from data.data_loader import SpectrogramParser
+from data_related.data_loader import SpectrogramParser
 from decoder import GreedyDecoder
 from opts import add_decoder_args, add_inference_args
 from transcribe import transcribe

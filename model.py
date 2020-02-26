@@ -7,6 +7,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 
+from data_related.data_loader import SAMPLE_RATE, get_feature_dim
+
 supported_rnns = {
     'lstm': nn.LSTM,
     'rnn': nn.RNN,
@@ -144,8 +146,8 @@ class DeepSpeech(nn.Module):
         self.labels = labels
         self.bidirectional = bidirectional
 
-        sample_rate = self.audio_conf.get("sample_rate", 16000)
-        window_size = self.audio_conf.get("window_size", 0.02)
+        # sample_rate = self.audio_conf.get("sample_rate", SAMPLE_RATE)
+        # window_size = self.audio_conf.get("window_size", 0.02)
         num_classes = len(self.labels)
 
         self.conv = MaskConv(nn.Sequential(
@@ -157,7 +159,7 @@ class DeepSpeech(nn.Module):
             nn.Hardtanh(0, 20, inplace=True)
         ))
         # Based on above convolutions and spectrogram size using conv formula (W - F + 2P)/ S+1
-        rnn_input_size = int(math.floor((sample_rate * window_size) / 2) + 1)
+        rnn_input_size = get_feature_dim(audio_conf)#int(math.floor((sample_rate * window_size) / 2) + 1)
         rnn_input_size = int(math.floor(rnn_input_size + 2 * 20 - 41) / 2 + 1)
         rnn_input_size = int(math.floor(rnn_input_size + 2 * 10 - 21) / 2 + 1)
         rnn_input_size *= 32

@@ -36,6 +36,17 @@ def load_audio(path):
             sound = sound.mean(axis=1)  # multiple channels, average
     return sound
 
+def get_feature_dim(audio_conf):
+    feature_type = audio_conf["feature_type"]
+    if feature_type == "mfcc":
+        FEATURE_DIM = 40
+    elif feature_type == 'mel':
+        FEATURE_DIM = 128
+    elif feature_type == 'stft':
+        FEATURE_DIM = int(math.floor((audio_conf['sample_rate'] * audio_conf['window_size']) / 2) + 1)# 161
+    else:
+        assert False
+    return FEATURE_DIM
 
 # def load_audio(path):
 #     sound, sample_rate = torchaudio.load(path, normalization=True)
@@ -123,12 +134,11 @@ class SpectrogramParser(AudioParser):
         )
         self.noise_prob = audio_conf.get("noise_prob")
         if self.feature_type == "mfcc":
-            FEATURE_DIM = 40
             self.mfcc = torchaudio.transforms.MFCC(
-                sample_rate=SAMPLE_RATE, n_mfcc=FEATURE_DIM
+                sample_rate=SAMPLE_RATE, n_mfcc=get_feature_dim(audio_conf)
             )
         elif self.feature_type == 'mel':
-            self.mel = torchaudio.transforms.MelSpectrogram(sample_rate=SAMPLE_RATE)
+            self.mel = torchaudio.transforms.MelSpectrogram(sample_rate=SAMPLE_RATE,n_mels=get_feature_dim(audio_conf))
 
     def parse_audio(self, audio_path):
         if self.augment:

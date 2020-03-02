@@ -278,6 +278,9 @@ if __name__ == "__main__":
         package = torch.load(
             args.continue_from, map_location=lambda storage, loc: storage
         )
+        if 'feature_type' not in package['audio_conf']:
+            package['audio_conf']['feature_type']='stft'
+
         model = DeepSpeech.load_model_package(package)
         labels = model.labels
         audio_conf = model.audio_conf

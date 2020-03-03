@@ -19,7 +19,6 @@
     python transcribe.py --model-path librispeech_models/libri_full_final.pth --audio-path LibriSpeech_dataset/train/wav/4133-6541-0035.wav
     
 # RUNS
-30_000 shortest examples, ran on gpu016, got 61% WER
 
 librispeech-clean-100
 
@@ -41,21 +40,30 @@ for debug
 
 * full
  
-    python -m multiproc train.py --labels-path spanish_vocab.json --train-manifest spanish_train_manifest.csv --val-manifest spanish_eval_manifest.csv --id spanish --save-folder checkpoints/spanish
-
+    python -m multiproc train.py --labels-path spanish_vocab.json --train-manifest spanish_train_manifest.csv --val-manifest spanish_eval_manifest.csv --id spanish
+    
 * mel
- 
-    python -m multiproc train.py --feature-type mel --labels-path spanish_vocab.json --train-manifest spanish_train_manifest.csv --val-manifest spanish_eval_manifest.csv --id spanish_mel --save-folder checkpoints/spanish_mel
+
+ hung up forever with this 
+
+        Epoch: [3][301/1469]    Time 1.925 (1.839)      Data 0.002 (0.064)      Loss 48.2371 (48.2371)
+        WARNING: received a nan loss, setting loss value to 0
+        Skipping grad update
+
+    python -m multiproc train.py --batch-size 60 --feature-type mel --continue-from checkpoints/spanish_mel/deepspeech_2.pth.tar --labels-path spanish_vocab.json --id spanish_mel
+
 * augmented
 
-    python -m multiproc train.py --augment --labels-path spanish_vocab.json --train-manifest spanish_train_manifest.csv --val-manifest spanish_eval_manifest.csv --id spanish_augmented --save-folder checkpoints/spanish_augmented
+    python -m multiproc train.py --feature-type stft --continue-from checkpoints/spanish_augmented/deepspeech_5.pth.tar --augment --labels-path spanish_vocab.json --train-manifest spanish_train_manifest.csv --val-manifest spanish_eval_manifest.csv --id spanish_augmented
 
 #### transcribing
     
     python transcribe_manifest.py --model-path librispeech_save/spanish/deepspeech_2.pth.tar --manifest spanish_eval_manifest.csv
 
 # TODO
-* librispeech-clean-100 should lead to ~30% WER!! 
-    -> original running on gpu006
-* reproduce CER/WER on librispeech! running on gpu019
-* loading audio with torchaudio + resampling to 16kHz + test it on librispeech!
+* data-augmentation gain+tempo doing any good?
+    * ja it seems to do so
+* adding noise to signal doing any good? noise generation
+
+
+ffplay -f lavfi 'amovie=original.wav, asplit [a][out1];[a] showspectrum=mode=separate:color=intensity:slide=1:scale=cbrt [out0]'

@@ -31,13 +31,13 @@ parser.add_argument(
     "--train-manifest",
     metavar="DIR",
     help="path to train manifest csv",
-    default="libri_train_manifest.csv",
+    default="spanish_train_manifest.csv",
 )
 parser.add_argument(
     "--val-manifest",
     metavar="DIR",
     help="path to validation manifest csv",
-    default="libri_val_manifest.csv",
+    default="spanish_eval_manifest.csv",
 )
 parser.add_argument("--sample-rate", default=16000, type=int, help="Sample rate")
 parser.add_argument(
@@ -48,7 +48,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--labels-path",
-    default="labels.json",
+    default="spanish_vocab.json",
     help="Contains all characters for transcription",
 )
 parser.add_argument(
@@ -250,7 +250,6 @@ if __name__ == "__main__":
     np.random.seed(args.seed)
     random.seed(args.seed)
 
-    device = torch.device("cuda" if args.cuda else "cpu")
     args.distributed = args.world_size > 1
     main_proc = True
     device = torch.device("cuda" if args.cuda else "cpu")
@@ -264,7 +263,7 @@ if __name__ == "__main__":
             rank=args.rank,
         )
         main_proc = args.rank == 0  # Only the first proc should save models
-    save_folder = args.save_folder
+    save_folder = os.path.join(args.save_folder, args.id)
     os.makedirs(save_folder, exist_ok=True)  # Ensure save folder exists
     things_to_monitor = ['loss_results','cer_results','wer_results','loss_eval_results']
     log_data = {k:torch.Tensor(args.epochs) for k in things_to_monitor}
@@ -430,7 +429,7 @@ if __name__ == "__main__":
             tensorboard_logger.update(epoch, log_data, model.named_parameters())
 
         if main_proc and args.checkpoint:
-            file_path = "%s/deepspeech_%d.pth.tar" % (os.path.join(save_folder,args.id), epoch + 1)
+            file_path = "%s/deepspeech_%d.pth.tar" % (save_folder, epoch + 1)
             torch.save(
                 DeepSpeech.serialize(
                     model,

@@ -24,7 +24,7 @@ from decoder import GreedyDecoder
 from logger import VisdomLogger, TensorBoardLogger
 from model import DeepSpeech, supported_rnns
 from test import evaluate
-from utils import reduce_tensor, check_loss, calc_loss, train_one_epoch
+from train_util import train_one_epoch
 
 parser = argparse.ArgumentParser(description="DeepSpeech training")
 parser.add_argument(

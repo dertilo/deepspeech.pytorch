@@ -3,6 +3,8 @@ import time
 import torch
 
 from utils import calc_loss, check_loss
+from apex import amp
+from apex.parallel import DistributedDataParallel
 
 
 def train_one_epoch(

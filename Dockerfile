@@ -1,4 +1,4 @@
-FROM pytorch/pytorch:1.1.0-cuda10.0-cudnn7.5-devel
+FROM pytorch/pytorch:1.2-cuda10.0-cudnn7-devel
 
 WORKDIR /workspace/
 
@@ -16,8 +16,7 @@ RUN cd warp-ctc; mkdir build; cd build; cmake ..; make
 RUN cd warp-ctc; cd pytorch_binding; python setup.py install
 
 # install pytorch audio
-RUN git clone https://github.com/pytorch/audio.git
-RUN cd audio; python setup.py install
+RUN pip install torchaudio==0.3.0
 
 # install ctcdecode
 RUN git clone --recursive https://github.com/parlance/ctcdecode.git
@@ -32,8 +31,3 @@ RUN cd apex; pip install .
 # install deepspeech.pytorch
 ADD . /workspace/deepspeech.pytorch
 RUN cd deepspeech.pytorch; pip install -r requirements.txt
-
-# launch jupiter
-RUN pip install jupyter
-RUN mkdir data; mkdir notebooks;
-CMD jupyter-notebook --ip="*" --no-browser --allow-root

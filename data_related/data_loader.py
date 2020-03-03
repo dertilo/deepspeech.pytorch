@@ -15,7 +15,8 @@ from scipy.io.wavfile import read
 import math
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
-from .spec_augment import spec_augment
+
+from data_related.spec_augment import spec_augment
 
 windows = {
     "hamming": scipy.signal.hamming,
@@ -150,6 +151,7 @@ class SpectrogramParser(AudioParser):
             add_noise = np.random.binomial(1, self.noise_prob)
             if add_noise:
                 y = self.noiseInjector.inject_noise(y)
+
         if self.feature_type == "mfcc":
             feat = self.mfcc.forward(torch.from_numpy(y).unsqueeze(0)).data.squeeze(0)
         elif self.feature_type == "stft":

@@ -15,7 +15,7 @@ import os.path
 import json
 
 
-def decode_results(decoded_output, decoded_offsets):
+def decode_results(decoded_output, decoded_offsets,args):
     results = {
         "output": [],
         "_meta": {
@@ -96,4 +96,4 @@ if __name__ == "__main__":
         device=device,
         use_half=args.half,
     )
-    print(json.dumps(decode_results(decoded_output, decoded_offsets)))
+    print(json.dumps(decode_results(decoded_output, decoded_offsets,args)))

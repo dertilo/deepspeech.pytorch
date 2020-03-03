@@ -1,6 +1,5 @@
 import math
 from collections import OrderedDict
-from apex.parallel import DistributedDataParallel
 
 import torch
 import torch.nn as nn
@@ -250,7 +249,7 @@ class DeepSpeech(nn.Module):
                   log_data = None,
                   avg_loss=None,
                   meta=None):
-
+        from apex.parallel import DistributedDataParallel
         if isinstance(model, DistributedDataParallel):
             model = model.module
 

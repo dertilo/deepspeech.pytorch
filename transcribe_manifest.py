@@ -4,7 +4,7 @@ import warnings
 
 from tqdm import tqdm
 
-from data_related.data_utils import write_json
+from data_related.data_utils import write_json, write_lines
 from data_related.vocabulary import BLANK_CHAR
 from model import DeepSpeech
 from opts import add_decoder_args, add_inference_args
@@ -38,21 +38,9 @@ def read_lines(file, mode="b", encoding="utf-8", limit=None):
             yield line.replace("\n", "")
 
 
-if __name__ == "__main__":
-    arg_parser = argparse.ArgumentParser(description="DeepSpeech transcription")
-    arg_parser = add_inference_args(arg_parser)
-    arg_parser.add_argument("--manifest")
-    arg_parser.add_argument(
-        "--offsets",
-        dest="offsets",
-        action="store_true",
-        help="Returns time offset information",
-    )
-    arg_parser = add_decoder_args(arg_parser)
-    args = arg_parser.parse_args()
+def run_transcribtion(args, model_path):
     device = torch.device("cuda" if args.cuda else "cpu")
-    model:DeepSpeech = load_model(device, args.model_path, args.half)
-
+    model: DeepSpeech = load_model(device, model_path, args.half)
     if args.decoder == "beam":
         from decoder import BeamCTCDecoder
 
@@ -67,8 +55,9 @@ if __name__ == "__main__":
             num_processes=args.lm_workers,
         )
     else:
-        decoder = GreedyDecoder(model.labels, blank_index=model.labels.index(BLANK_CHAR))
-
+        decoder = GreedyDecoder(
+            model.labels, blank_index=model.labels.index(BLANK_CHAR)
+        )
     spect_parser = SpectrogramParser(model.audio_conf, normalize=True)
 
     def do_transcribe(audio_file):
@@ -92,10 +81,59 @@ if __name__ == "__main__":
             path = l
         return path
 
-    examples_g = (fix_path(l).split(",") for l in read_lines(args.manifest, limit=10))
+    lines_g = read_lines(args.manifest)
+    [next(lines_g) for _ in range(2_000)]
+    lines = [next(lines_g) for _ in range(10)]
+    examples_g = (fix_path(l).split(",") for l in lines)
     g = (
         (do_transcribe(audio_file), next(iter(read_lines(text_file))))
         for audio_file, text_file in tqdm(examples_g)
     )
+    # writer = MarkdownTableWriter()
+    # writer.table_name = "write example with a margin"
+    # writer.headers = ["int", "float", "str", "bool", "mix", "time"]
+    # writer.value_matrix = [
+    #     [0,   0.1,      "hoge", True,   0,      "2017-01-01 03:04:05+0900"],
+    #     [2,   "-2.23",  "foo",  False,  None,   "2017-12-23 45:01:23+0900"],
+    #     [3,   0,        "bar",  "true",  "inf", "2017-03-03 33:44:55+0900"],
+    #     [-10, -9.9,     "",     "FALSE", "nan", "2017-01-01 00:00:00+0900"],
+    # ]
+    # writer.margin = 1  # add a whitespace for both sides of each cell
+    #
+    # writer.write_table()
+    return list(g)
 
-    write_json('transcribed.json',list(g))
+
+if __name__ == "__main__":
+    arg_parser = argparse.ArgumentParser(description="DeepSpeech transcription")
+    arg_parser = add_inference_args(arg_parser)
+    arg_parser.add_argument("--manifest")
+    arg_parser.add_argument("--output", default="transcribed.csv")
+    arg_parser.add_argument(
+        "--offsets",
+        dest="offsets",
+        action="store_true",
+        help="Returns time offset information",
+    )
+    arg_parser = add_decoder_args(arg_parser)
+    args = arg_parser.parse_args()
+
+    # model_path = args.model_path
+
+    transcribed = [
+        (a, b)
+        for k in [40, 2]
+        for a, b in [("---", "---")]
+        + run_transcribtion(
+            args, "checkpoints/spanish_augmented/deepspeech_%d.pth.tar" % k
+        )
+    ]
+
+    lines = (
+        ["| " + " | ".join(["prediction", "target"])]
+        + ["| " + " | ".join(["---", "---"])]
+        + ["| " + " | ".join([a, b]) for a, b in transcribed]
+    )
+    write_lines(
+        args.output, lines,
+    )
